@@ -11,16 +11,21 @@ import java.util.Random;
 
 public class Driver implements Runnable, MouseMotionListener, KeyListener {
 
-    public static int WIDTH = 800, HEIGHT = 600;
-    public static final int numLines = 12;
-    private static final Random rand = new Random(6);
-    private int mouseX, mouseY;
+    static Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+    public static int WIDTH = (int) screenSize.getWidth(), HEIGHT = (int) screenSize.getHeight();
+    public static final int numLines = 8;
+    private static final Random rand = new Random(53);
     private Canvas canvas;
     private JFrame frame;
     private static float viewDirection = 0;
+    private static float viewAngle = (float) (Math.PI / 3);
+    private float cameraX = WIDTH / 2, cameraY = HEIGHT / 2;
+    private static float cameraDirection = viewDirection - viewAngle / 2;
+    private static float cameraSpeed = 4.5f;
+    private static int maxDist = 1200;
+    private static int resolution = 100;
     private static Color rayColor = Color.WHITE;
-    private static float attentionDistance = 80;
-    private static int maxDist= 800;
+    //    private static float attentionDistance = 80;
     LinkedList<Line2D.Float> lines;
 
     private Driver() {
@@ -36,6 +41,7 @@ public class Driver implements Runnable, MouseMotionListener, KeyListener {
         Cursor blankCursor = Toolkit.getDefaultToolkit().createCustomCursor(
                 cursorImg, new Point(0, 0), "blank cursor");
         frame.setCursor(blankCursor);
+
 
         canvas.setFocusable(true);
 
@@ -85,18 +91,26 @@ public class Driver implements Runnable, MouseMotionListener, KeyListener {
 
         // Draw the rays
         g.setColor(rayColor);
-        LinkedList<Line2D.Float> rays = calcRays(lines, mouseX, mouseY, 60, maxDist);
+        LinkedList<Line2D.Float> rays = calcRays(lines, (int) cameraX, (int) cameraY, resolution, maxDist);
         for (Line2D.Float ray : rays) {
             g.drawLine((int) ray.getX1(), (int) ray.getY1(), (int) ray.getX2(), (int) ray.getY2());
         }
 
-        // Draw the attention circle (when any wall is in it, rays change their color to red)
-        g.setColor(new Color(0x9F1E1E));
-        g.drawOval((int) (mouseX - attentionDistance), (int) (mouseY - attentionDistance), (int) attentionDistance * 2, (int) attentionDistance * 2);
+//        // Draw the attention circle (when any wall is in it, rays change their color to red)
+//        g.setColor(new Color(0x9F1E1E));
+//        g.drawOval((int) (cameraX - attentionDistance), (int) (cameraY - attentionDistance), (int) attentionDistance * 2, (int) attentionDistance * 2);
 
         // Draw help hint in the corner
         g.setColor(new Color(0x208000));
-        g.drawString("H to Help", WIDTH - 80, HEIGHT - 50);
+        g.setFont(new Font("Arial", Font.ITALIC, (int) (HEIGHT*0.02)));
+        g.drawString("H to Help", (int) (WIDTH*0.01), (int) (HEIGHT * 0.02));
+//        g.drawString(""+viewDirection, cameraX, cameraY);
+
+        try {
+            new Robot().mouseMove(WIDTH / 2, HEIGHT / 2);
+        } catch (AWTException e) {
+            throw new RuntimeException(e);
+        }
 
         g.dispose();
         bs.show();
@@ -130,89 +144,128 @@ public class Driver implements Runnable, MouseMotionListener, KeyListener {
         return -1; // No collision
     }
 
-    private LinkedList<Line2D.Float> calcRays(LinkedList<Line2D.Float> lines, int mouseX, int mouseY,
+    private LinkedList<Line2D.Float> calcRays(LinkedList<Line2D.Float> lines, int cameraX, int cameraY,
                                               int resolution, int maxDist) {
         LinkedList<Line2D.Float> rays = new LinkedList<>();
         boolean isAttention = false;
         for (int i = 0; i < resolution; i++) {
             // Shot rays in some part of circle (PI/3) which we can rotate
-            double dir = viewDirection + -Math.PI / 3 * ((double) i / resolution);
+            double dir = viewDirection + -viewAngle * ((double) i / resolution);
             float minDist = maxDist;
             for (Line2D.Float line : lines) {
                 // Calculate distance from our "cursor" to all lines in every direction
-                float dist = getRayCast(mouseX, mouseY, mouseX + (float) Math.cos(dir) * maxDist,
-                        mouseY + (float) Math.sin(dir) * maxDist, line.x1, line.y1, line.x2, line.y2);
+                float dist = getRayCast(cameraX, cameraY, cameraX + (float) Math.cos(dir) * maxDist,
+                        cameraY + (float) Math.sin(dir) * maxDist, line.x1, line.y1, line.x2, line.y2);
 
                 // Then find first collision, which has min distance
                 if (dist < minDist && dist > 0) {
                     minDist = dist;
                 }
 
-                // If distance to some line is lower than attention distance, then attention flag get pulled up
-                if (minDist < attentionDistance) {
-                    isAttention = true;
-                }
+//                // If distance to some line is lower than attention distance, then attention flag get pulled up
+//                if (minDist < attentionDistance) {
+//                    isAttention = true;
+//                }
             }
 
             // Fill rays list
-            rays.add(new Line2D.Float(mouseX, mouseY, mouseX + (float) Math.cos(dir) * minDist, mouseY + (float) Math.sin(dir) * minDist));
+            rays.add(new Line2D.Float(cameraX, cameraY, cameraX + (float) Math.cos(dir) * minDist, cameraY + (float) Math.sin(dir) * minDist));
         }
 
-        // If some ray length is lower than attention distance, then all rays become red
-        if (isAttention) {
-            rayColor = new Color(0xCC2626); // Change color of rays to white
-        } else {
-            rayColor = Color.WHITE; // Change color of rays to white
-        }
+//        // If some ray length is lower than attention distance, then all rays become red
+//        if (isAttention) {
+//            rayColor = new Color(0xCC2626); // Change color of rays to white
+//        } else {
+//            rayColor = Color.WHITE; // Change color of rays to white
+//        }
 
         return rays;
     }
 
     @Override
     public void mouseDragged(MouseEvent e) {
-        mouseX = e.getX();
-        mouseY = e.getY();
+        int shift = e.getX() - WIDTH / 2 + WIDTH / 190;
+        viewDirection = (float) ((viewDirection + (float) shift / 500) % (Math.PI * 2));
+        cameraDirection = (float) ((cameraDirection + (float) shift / 500) % (Math.PI * 2));
     }
 
     @Override
     public void mouseMoved(MouseEvent e) {
-        mouseX = e.getX();
-        mouseY = e.getY();
+        int shift = e.getX() - WIDTH / 2 + WIDTH / 190;
+        viewDirection = (float) ((viewDirection + (float) shift / 500) % (Math.PI * 2));
+        cameraDirection = (float) ((cameraDirection + (float) shift / 500) % (Math.PI * 2));
     }
 
     @Override
     public void keyTyped(KeyEvent e) {
-
+        switch (e.getKeyChar()) {
+            case KeyEvent.VK_W -> {
+                cameraX += (float) Math.cos(cameraDirection) * cameraSpeed;
+                cameraY += (float) Math.sin(cameraDirection) * cameraSpeed;
+            }
+            case KeyEvent.VK_S -> {
+                cameraX -= (float) Math.cos(cameraDirection) * cameraSpeed;
+                cameraY -= (float) Math.sin(cameraDirection) * cameraSpeed;
+            }
+            case KeyEvent.VK_A -> {
+                cameraX += (float) Math.sin(cameraDirection) * cameraSpeed;
+                cameraY -= (float) Math.cos(cameraDirection) * cameraSpeed;
+            }
+            case KeyEvent.VK_D -> {
+                cameraX -= (float) Math.sin(cameraDirection) * cameraSpeed;
+                cameraY += (float) Math.cos(cameraDirection) * cameraSpeed;
+            }
+        }
     }
 
     @Override
     public void keyPressed(KeyEvent e) {
         switch (e.getKeyCode()) {
-            case KeyEvent.VK_A -> {
-                viewDirection -= Math.PI / 60;
-            }
-            case KeyEvent.VK_D -> {
-                viewDirection += Math.PI / 60;
-            }
             case KeyEvent.VK_W -> {
-                if(maxDist >= attentionDistance) {
-                    maxDist += 10;
-                }
+                cameraX += (float) Math.cos(cameraDirection) * cameraSpeed;
+                cameraY += (float) Math.sin(cameraDirection) * cameraSpeed;
             }
             case KeyEvent.VK_S -> {
-                if (maxDist > attentionDistance) {
-                    maxDist -= 10;
-                }
+                cameraX -= (float) Math.cos(cameraDirection) * cameraSpeed;
+                cameraY -= (float) Math.sin(cameraDirection) * cameraSpeed;
+            }
+            case KeyEvent.VK_A -> {
+                cameraX += (float) Math.sin(cameraDirection) * cameraSpeed;
+                cameraY -= (float) Math.cos(cameraDirection) * cameraSpeed;
+            }
+            case KeyEvent.VK_D -> {
+                cameraX -= (float) Math.sin(cameraDirection) * cameraSpeed;
+                cameraY += (float) Math.cos(cameraDirection) * cameraSpeed;
             }
             case KeyEvent.VK_H -> {
                 new HelpWindow();
+            }
+            case KeyEvent.VK_ESCAPE -> {
+                System.exit(0);
             }
         }
     }
 
     @Override
     public void keyReleased(KeyEvent e) {
-
+        switch (e.getKeyCode()) {
+            case KeyEvent.VK_W -> {
+                cameraX += (float) Math.cos(cameraDirection)*cameraSpeed;
+                cameraY += (float) Math.sin(cameraDirection)*cameraSpeed;
+            }
+            case KeyEvent.VK_S -> {
+                cameraX -= (float) Math.cos(cameraDirection) * cameraSpeed;
+                cameraY -= (float) Math.sin(cameraDirection) * cameraSpeed;
+            }
+            case KeyEvent.VK_A -> {
+                cameraX += (float) Math.sin(cameraDirection) * cameraSpeed;
+                cameraY -= (float) Math.cos(cameraDirection) * cameraSpeed;
+            }
+            case KeyEvent.VK_D -> {
+                cameraX -= (float) Math.sin(cameraDirection) * cameraSpeed;
+                cameraY += (float) Math.cos(cameraDirection) * cameraSpeed;
+            }
+        }
     }
 
     public static void main(String[] args) {
