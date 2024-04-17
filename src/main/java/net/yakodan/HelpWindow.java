@@ -56,7 +56,4 @@ public class HelpWindow extends JFrame implements KeyListener {
 
     }
 
-//    public static void main(String[] args) {
-//        new net.yakodan.HelpWindow();
-//    }
 }
