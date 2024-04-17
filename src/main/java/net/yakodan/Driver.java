@@ -115,7 +115,7 @@ public class Driver implements Runnable, MouseMotionListener, KeyListener {
         for (int i = 0; i < resolution; i++) {
             Line2D.Double ray = rays.get(rays.size() - i - 1);
             double distance = dist(ray.getX1(), ray.getY1(), ray.getX2(), ray.getY2());
-            double colHeight = calcWallHeight(ray, distance);
+            double colHeight = calcWallHeight(distance);
 
             g.setColor(calcColor(distance));
             g.fillRect((int) (colWidth * i), (int) (HEIGHT - colHeight) / 2, (int) (colWidth), (int) (colHeight));
@@ -138,7 +138,7 @@ public class Driver implements Runnable, MouseMotionListener, KeyListener {
         return new Color(0, 0, 0);
     }
 
-    private double calcWallHeight(Line2D.Double line, double distance) {
+    private double calcWallHeight(double distance) {
         if (distance < 10) {
             return HEIGHT;
         }
